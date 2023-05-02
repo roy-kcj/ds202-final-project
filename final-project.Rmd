@@ -1,0 +1,194 @@
+---
+title: "FinalProject"
+author: "Roy Khoo"
+date: "2023-04-28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(dplyr)
+```
+# Data Description
+
+The dataset is obtained from kaggle at https://www.kaggle.com/datasets/salvatorerastelli/spotify-and-youtube?resource=download
+
+Some elements that the dataset observed includes the streams, views, album names and other objective statistic of songs released in spotify along with their youtube counterpart. The data was collected in 7th February, 2023 as stated by the providers of the dataset.
+
+## Questions
+What are the distribution of streams/views of songs in the dataset?
+What's the most popular album type?
+How does Danceability correlate with streams?
+How are songs of in different keys distributed by stream?
+Who are the 10 most popular artist on Spotify and Youtube? How do they compare to each other?
+What are the 5 most popular songs by streams? Similarly by views?
+
+
+
+# Data Loading
+
+```{r}
+df = read.csv("data\\Spotify_Youtube.csv")
+```
+
+# Data Cleaning
+
+In order to get working on the dataset, I will likely changed all variables to their correct form, eg: views as numeric, album type as factor, etc. Additionally, I would like to analyze the dataset alongside their youtube counterpart, thus I would remove any dataset that does not have any collection of youtube data. Similarly, I would check for which column has N/A values and drop where it makes sense. This would involve turning all blank and 0 entries into N/A.
+
+```{r, results='hide'}
+str(df)
+df_clean = df
+df_clean[df == "" | df == " "] = NA
+
+# Checking where NA is present
+sapply(df_clean, function(x) sum(is.na(x)))
+
+# Some Youtube music videos may have disabled comments and likes or no description, thus not dropping their data.
+# Otherwise, NA values are dropped
+df_clean["Likes"][is.na(df_clean["Likes"])] = 0
+df_clean["Comments"][is.na(df_clean["Comments"])] = 0
+df_clean["Description"][is.na(df_clean["Description"])] = ""
+
+df_clean = na.omit(df_clean)
+
+df_clean = df_clean %>% mutate(
+  Artist = as.factor(Artist),
+  Album = as.factor(Album),
+  Album_type = as.factor(Album_type),
+  Channel = as.factor(Channel),
+  Licensed = as.factor(Licensed),
+  official_video = as.factor(official_video)
+)
+
+summary(df_clean)
+```
+
+# Data Analyzing
+
+```{r}
+# Plotting the distribution of songs by Views and Stream count
+ggplot(data = df_clean, aes(x = Stream)) + geom_histogram(bins = 50, fill = 'red') + 
+  scale_x_continuous(labels = scales::comma) + 
+  labs(title = "Distribution of Streams",
+       x = "Total Stream",
+       y = "Number of Tracks")
+ggplot(data = df_clean, aes(x = Views)) + geom_histogram(bins = 50, fill = 'blue') + 
+  scale_x_continuous(labels = scales::comma) + 
+  labs(title = "Distribution of Views",
+       x = "Total Views",
+       y = "Number of Tracks")
+```
+
+Observations:
+We can observe that the distribution of Views and Stream on Youtube and Spotify respectively are right-skewed. This would mean generally most songs are not as well received and fit only their niche and there are few songs that are really popular overall. 
+
+```{r}
+# Plotting different type of album types
+ggplot(data = df_clean, aes(x = Album_type)) + geom_bar() + 
+  labs(title = "Album Type Distribution",
+       x = "Album Type",
+       y = "Number of Tracks")
+ggplot(data = df_clean, aes(x = Album_type, fill = Licensed)) + geom_bar(position = "dodge2") + 
+  labs(title = "Album Type Distribution",
+       x = "Album Type",
+       y = "Number of Tracks")
+```
+
+Observations:
+We can observed that the most popular album type is album followed by singles, then compilations. Additionally, majority of compilation videos of these songs are not licensed, while albums are generally licensed more. This could most likely be as the process of making album is more standardized in the industry with necessary procedures and such.
+
+```{r}
+# Plotting correlation between Danceability and Streams
+df_clean %>%  group_by(Danceability) %>%
+  summarise(mean_stream = mean(Stream)) %>%
+  ggplot(aes(x = Danceability, y = mean_stream)) + geom_line() + 
+  labs(title = "Graph of Danceability vs Streams",
+       x = "Danceability",
+       y = "Mean Stream")
+```
+
+Observations:
+There is some slight trend in which tracks that are more dance-able are streamed more on average. This could likely be as they are songs that are played more in a social setting (eg: Karaoke, Parties). Though, there are potentially other factors that needs to be considered before making this conclusion. As we can observe that even between a small range of danceabiity there are a wide variance in stream amount, which may suggest that perhaps songs that are belongs to a wider genre may have more impact on streams than danceability. There is likely outliers on songs that seemed to be or near undanceable.
+
+```{r}
+# Plotting distribution of different keys by stream?
+ggplot(data = df_clean, aes(x = reorder(as.factor(Key), Stream, FUN = mean), y = Stream)) + 
+  geom_boxplot() + coord_flip() + 
+  labs(title = "Distribution of Streams by Key Major",
+       x = "Key Major",
+       y = "Streams")
+```
+
+Observations:
+It would seem that tracks that are in C♯/D♭ generally has more stream. This perhaps shows the preference of the general population of certain key major tracks. Interesting enough the most streamed song seemed to be from Key 1 as well, which may have a large impact on the average streams of the Key 1 group as streams as established before are very "feast or famine" in which few songs have large amount of views/streams, while most others have few views/streams.
+
+```{r}
+# Plotting 10 most popular artists on Spotify and Youtube
+
+# 10 most popular artist in Spotify
+df_stream_by_artist = df_clean %>%
+  group_by(Artist) %>%
+  summarise(Total = sum(Stream)) %>%
+  arrange(desc(Total)) %>%
+  head(10)
+
+# 10 most popular artist in Youtube
+df_views_by_artist = df_clean %>%
+  group_by(Artist) %>%
+  summarise(Total = sum(Views)) %>%
+  arrange(desc(Total)) %>%
+  head(10)
+
+ggplot(data = df_stream_by_artist, aes(x = reorder(Artist, Total), fill = Artist)) + 
+  geom_bar(aes(weight = Total)) + scale_y_continuous(labels = scales::comma) + 
+  coord_flip() + guides(fill = FALSE) + 
+  labs(title = "Top 10 Most Streamed Artist",
+       x = "Artist",
+       y = "Total Streams")
+
+ggplot(data = df_views_by_artist, aes(x = reorder(Artist, Total), fill = Artist)) + 
+  geom_bar(aes(weight = Total)) + scale_y_continuous(labels = scales::comma) + 
+  coord_flip() + guides(fill = FALSE) + 
+  labs(title = "Top 10 Most Viewed Artist",
+       x = "Artist",
+       y = "Total Views")
+```
+
+Observations:
+There are slight difference in popular artist in Spotify and Youtube. For instance, Post Malone has more presence in Spotify, while not making it into the top 10 of Youtube artist. Similarly, the Weeknd and a few other artists are more popular on one of the two music providers. Subsequently, Ed Sheeran seemed to be most popular artist overall in terms of views/streams of both Spotify and Youtube. Interestingly enough, only Justin Bieber maintains the same rank in both list.
+
+```{r}
+#Plotting 5 most popular track by Stream and Views separately
+
+# 5 most popular track in Spotify
+df_track_by_stream = df_clean %>%
+  group_by(Track) %>%
+  summarise(Total = sum(Stream)) %>%
+  arrange(desc(Total)) %>%
+  head(5)
+
+# 5 most popular tracks in Youtube
+df_track_by_views = df_clean %>%
+  group_by(Track) %>%
+  summarise(Total = sum(Views)) %>%
+  arrange(desc(Total)) %>%
+  head(5)
+
+ggplot(data = df_track_by_stream, aes(x = reorder(Track, Total), fill = Track)) + 
+  geom_bar(aes(weight = Total)) + scale_y_continuous(labels = scales::comma) + 
+  coord_flip() + guides(fill = FALSE) + 
+  labs(title = "Top 5 Most Streamed Tracks",
+       x = "Track",
+       y = "Total Streams")
+
+ggplot(data = df_track_by_views, aes(x = reorder(Track, Total), fill = Track)) + 
+  geom_bar(aes(weight = Total)) + scale_y_continuous(labels = scales::comma) + 
+  coord_flip() + guides(fill = FALSE) + 
+  labs(title = "Top 5 Most Viewed Tracks",
+       x = "Track",
+       y = "Total Views")
+```
+
+Observations:
+It would seemed that the top of music views in Youtube are significantly higher than that of Spotify streams. Additionally, Despacito being the most viewed song is inline with the craze during 2017. By personal knowledge, the top songs in Spotify seemed to be from songs from more recent years compared to Youtube's. This could suggest that the population is shifting away from using Youtube to using Spotify more now for music use. This could also suggest that perhaps Spotify users are more aware of new music. 
