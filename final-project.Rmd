@@ -16,6 +16,9 @@ The dataset is obtained from kaggle at https://www.kaggle.com/datasets/salvatore
 
 Some elements that the dataset observed includes the streams, views, album names and other objective statistic of songs released in spotify along with their youtube counterpart. The data was collected in 7th February, 2023 as stated by the providers of the dataset.
 
+## GitHub Repository
+https://github.com/roy-kcj/ds202-final-project
+
 ## Questions
 What are the distribution of streams/views of songs in the dataset?
 What's the most popular album type?
